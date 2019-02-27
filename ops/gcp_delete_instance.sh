@@ -28,6 +28,15 @@ main() {
         echo "WARNING: It will delete all gcloud compute instances"
     fi
 
+
+    cat <<EOF
+WARNING: This script will delete your gcloud compute instances if this is not what you intend
+    You may press Ctrl+C now to abort this script.
+EOF
+    set -x
+    sleep 20
+    set +x
+
     for i in $(gcloud compute instances list | awk 'FNR>1{print $1}')
     do 
         if [[ $i == *"$NAME"* ]]
