@@ -35,7 +35,6 @@ WARNING: This script will delete your gcloud compute instances if this is not wh
 EOF
     set -x
     sleep 20
-    set +x
 
     for i in $(gcloud compute instances list | awk 'FNR>1{print $1}')
     do 

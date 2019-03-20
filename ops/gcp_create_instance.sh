@@ -2,7 +2,7 @@
 
 gcp_region="europe-west1"
 gcp_zone="europe-west1-b"
-machine="n1-standard-1"
+machine="n1-standard-2"
 image="ubuntu-1804-lts"
 INSTANCE_NAME=$1
 NO_OF_MINIONS=$2
@@ -48,6 +48,17 @@ parse_flags() {
     done
 }
 
+create_addresses() {
+    for i in $(seq 1 $NO_OF_MANAGERS);
+    do 
+        set +x
+        gcloud compute addresses create "$INSTANCE_NAME-$i" --region $gcp_region
+        set -x
+    done
+        
+
+}
+
 
 create_instances() {
 
@@ -55,23 +66,29 @@ create_instances() {
     do
         inst_name="$INSTANCE_NAME-minion-$i"
         echo "Creating instance $inst_name"
+        set +x
         gcloud compute instances create "$inst_name" \
         --can-ip-forward  \
         --machine-type "$machine" \
         --image-family "$image" \
         --boot-disk-size "20gb" --image-project "ubuntu-os-cloud" 
+        set -x
 
     done
 
     for i in $(seq 1 $NO_OF_MANAGERS)
     do
+        ip_addr=$(gcloud compute addresses list | grep "$INSTANCE_NAME\-$i" | awk '{print $2}')
         inst_name="$INSTANCE_NAME-controller-$i"
         echo "Creating instance $inst_name"
+        set +x
         gcloud compute instances create "$inst_name" \
         --can-ip-forward  \
         --machine-type "$machine" \
         --image-family "$image" \
-        --boot-disk-size "20gb" --image-project "ubuntu-os-cloud" 
+        --address "$ip_addr" \
+        --boot-disk-size "20gb" --image-project "ubuntu-os-cloud"  
+        set -x
 
     done
 
@@ -81,8 +98,6 @@ error() {
     echo "$1"
     exit 1
 }
-
-
 
 init() {
     if [ $EUID -ne 0 ]
@@ -95,7 +110,10 @@ init() {
     fi
 
     parse_flags $@
+    create_addresses
     create_instances
+    echo $NO_OF_MANAGERS
+
 }
 
 init

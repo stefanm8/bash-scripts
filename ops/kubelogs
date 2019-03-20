@@ -1,0 +1,67 @@
+#!/usr/bin/python
+import subprocess
+import json
+import argparse
+import multiprocessing
+
+
+def exec_command(cmd):
+  return str(subprocess.check_output(cmd.split(" ")))
+
+
+def run_command(command):
+    process = subprocess.Popen(command.split(" "), stdout=subprocess.PIPE)
+    while True:
+      output = process.stdout.readline()
+      if output == '' and process.poll() is not None:
+        break
+      if output:
+        print(output.strip())
+    rc = process.poll()
+    return rc
+
+def kubectl_cmd(cmd, args):
+  if args.namespace != None:
+    cmd = "{} -n {}".format(cmd, args.namespace)
+  if args.lines != None:
+    cmd = "{} --tail={}".format(cmd, args.lines)
+  return cmd
+
+def csv_to_json(data):
+  rows = list(map(lambda x: x.split(), data.split('\n')))
+  cols = rows.pop(0)
+  cols = list(map(lambda x: x.lower(), cols))
+  return [{cols[index]: item for index, item in enumerate(r)} for r in rows] 
+
+def get_pods(name, namespace, inverse=True):
+  cmd = "kubectl get -owide -n {} pods".format(namespace)
+  out = csv_to_json(exec_command(cmd))
+  name = name.lower()
+  if inverse:
+    return [i for i in out if not name in i.get("name", "").lower()]
+  return [i for i in out if name in i.get("name", "").lower()]
+
+def stream_logs(pods, args):
+
+  for p in pods:
+    if not "name" in p: continue
+    cmd = kubectl_cmd("kubectl logs", args)
+    cmd = "{} {}".format(cmd, p["name"])
+    run_command(cmd)
+        
+
+if __name__ == "__main__":
+  parser = argparse.ArgumentParser(description="Follows logs from multiple pods")
+  parser.add_argument("name", help="Pod name to look for")
+  parser.add_argument("-l", "--lines", help="No of lines to take from each log")
+  parser.add_argument("-n", "--namespace", help="Namespace")
+  parser.add_argument("-i", "--inverse", help="Does not container 'name'", default=False, action="store_true")
+
+  args = parser.parse_args()
+  
+  stream_logs(get_pods(args.name, args.namespace, inverse=args.inverse), args)
+
+
+
+
+
