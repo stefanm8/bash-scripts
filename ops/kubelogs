@@ -5,6 +5,7 @@ import argparse
 import multiprocessing
 
 
+
 def exec_command(cmd):
   return str(subprocess.check_output(cmd.split(" ")))
 
