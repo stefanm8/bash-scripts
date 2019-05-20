@@ -48,17 +48,6 @@ parse_flags() {
     done
 }
 
-create_addresses() {
-    for i in $(seq 1 $NO_OF_MANAGERS);
-    do 
-        set +x
-        gcloud compute addresses create "$INSTANCE_NAME-$i" --region $gcp_region
-        set -x
-    done
-        
-
-}
-
 
 create_instances() {
 
@@ -71,26 +60,59 @@ create_instances() {
         --can-ip-forward  \
         --machine-type "$machine" \
         --image-family "$image" \
-        --boot-disk-size "20gb" --image-project "ubuntu-os-cloud" 
+        --boot-disk-size "20gb" --image-project "ubuntu-os-cloud" --async 
         set -x
 
     done
 
     for i in $(seq 1 $NO_OF_MANAGERS)
     do
-        ip_addr=$(gcloud compute addresses list | grep "$INSTANCE_NAME\-$i" | awk '{print $2}')
-        inst_name="$INSTANCE_NAME-controller-$i"
+        inst_name="$INSTANCE_NAME-manager-$i"
         echo "Creating instance $inst_name"
         set +x
         gcloud compute instances create "$inst_name" \
         --can-ip-forward  \
         --machine-type "$machine" \
         --image-family "$image" \
-        --address "$ip_addr" \
-        --boot-disk-size "20gb" --image-project "ubuntu-os-cloud"  
+        --boot-disk-size "20gb" --image-project "ubuntu-os-cloud" --async  
         set -x
 
     done
+
+}
+
+
+create_lb_address() {
+    echo "Creating lb ip address"
+    gcloud compute addresses create "$INSTANCE_NAME-lb" --region $gcp_region
+}
+
+create_lb() {
+    create_lb_address
+    ip_addr=$(gcloud compute addresses list | grep "$INSTANCE_NAME\-lb" | awk '{print $2}')
+    echo "Creating lb instance with ip $ip_addr"
+    set +x
+    gcloud compute instances create "$INSTANCE_NAME-lb" \
+    --can-ip-forward  \
+    --machine-type "$machine" \
+    --image-family "$image" \
+    --address "$ip_addr" \
+    --boot-disk-size "20gb" --image-project "ubuntu-os-cloud" 
+    set -x
+}
+
+prompt_user() {
+    msg="${NO_OF_MINIONS} minion nodes will be created\n${NO_OF_MANAGERS} masters nodes will be created\n1 load balancer \n1 static ip addr\nDo you want to cotinue?"
+    echo $msg
+    read -p "" -n 1 -r
+    echo    
+    if [[ $REPLY =~ ^[Yy]$ ]]
+    then
+        return
+    else
+        exit 1
+    fi
+EOF
 
 }
 
@@ -109,10 +131,11 @@ init() {
         error "You must have installed gcloud suite"
     fi
 
+
     parse_flags $@
-    create_addresses
+    prompt_user
     create_instances
-    echo $NO_OF_MANAGERS
+    create_lb
 
 }
 
